@@ -9,6 +9,11 @@ import gym
 import numpy as np
 import random
 from collections import deque
+config = tf.ConfigProto(device_count={"CPU": 4}, # limit to num_cpu_core CPU usage  
+                inter_op_parallelism_threads = 0,   
+                intra_op_parallelism_threads = 0,  
+                log_device_placement=True) 
+tf.enable_eager_execution(config)
 
 # Hyper Parameters for DQN
 GAMMA = 0.9 # discount factor for target Q
@@ -16,6 +21,7 @@ INITIAL_EPSILON = 0.5 # starting value of epsilon
 FINAL_EPSILON = 0.01 # final value of epsilon
 REPLAY_SIZE = 10000 # experience replay buffer size
 BATCH_SIZE = 32 # size of minibatch
+# tf.enable_eager_execution()
 
 class DQN():
   # DQN Agent
@@ -29,27 +35,26 @@ class DQN():
     self.action_dim = env.action_space.n
 
     self.create_Q_network()
-    # self.create_training_method()
 
-    # Init session
-    # self.session = tf.InteractiveSession()
-    # self.session.run(tf.initialize_all_variables())
 
   def create_Q_network(self):
     self.model = tf.keras.Sequential([
-      tf.keras.layers.Dense(10, activation="relu", input_shape=(self.state_dim,)),  # input shape required
-      tf.keras.layers.Dense(10, activation="relu"),
+      tf.keras.layers.Dense(20, activation="relu", input_shape=(self.state_dim,)),  # input shape required
       tf.keras.layers.Dense(self.action_dim)
     ])
-    self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.01)
+    self.optimizer = tf.train.AdamOptimizer(learning_rate=0.001)
 
-  def loss(self, model, x, y):
-    y_ = model(x)
-    return tf.losses.mean_squared_error(labels=y, logits=y_)
+  def loss(self, model, states, actions, q_values):
+    tmp_qs = model(states)
+    y_ = tf.multiply(actions, tmp_qs)
+    y_ = tf.reshape(tf.reduce_sum(y_, 1), [BATCH_SIZE, 1,])
 
-  def grad(self, model, inputs, targets):
+    loss = tf.losses.mean_squared_error(labels=q_values, predictions=y_)
+    return loss
+
+  def grad(self, model, states, actions, q_values):
     with tfe.GradientTape() as tape:
-      loss_value = loss(model, inputs, targets)
+      loss_value = self.loss(model, states, actions, q_values)
     return tape.gradient(loss_value, model.variables)
 
   def train_Q_network(self):
@@ -63,7 +68,9 @@ class DQN():
     # Step 2: calculate y
     Q_value_batch = []
     for i in range(0, BATCH_SIZE):
-      Q_value_batch.append(self.model(state_batch[i]))
+      s = tf.convert_to_tensor(next_state_batch[i], dtype=tf.float32)
+      s = tf.reshape(s, [1,self.state_dim])
+      Q_value_batch.append(self.model(s))
 
     y_batch = []
     for i in range(0, BATCH_SIZE):
@@ -72,12 +79,24 @@ class DQN():
         y_batch.append(reward_batch[i])
       else :
         y_batch.append(reward_batch[i] + GAMMA * np.max(Q_value_batch[i]))
+    state_tensor = tf.convert_to_tensor(state_batch, dtype=tf.float32)
+    action_tensor = tf.convert_to_tensor(action_batch, dtype=tf.float32)
+    reward_tensor = tf.convert_to_tensor(y_batch, dtype=tf.float32)
+    reward_tensor = tf.reshape(reward_tensor, [BATCH_SIZE, 1])
 
-    for i in range(0, BATCH_SIZE):
-      # Optimize the model
-      grads = self.grad(self.model, state_batch[i], y_batch[i])
-      self.optimizer.apply_gradients(zip(grads, self.model.variables),
-                              global_step=tf.train.get_or_create_global_step())
+    # print(state_tensor)
+    # print(reward_tensor)
+
+    # for i in range(0, BATCH_SIZE):
+    # Optimize the model
+    grads = self.grad(self.model, state_tensor, action_tensor, reward_tensor)
+    # print(grads)
+    # print(self.model.variables)
+    # print("applying grads")
+    self.optimizer.apply_gradients(zip(grads, self.model.variables),
+                            global_step=tf.train.get_or_create_global_step())
+    # self.sess.run(train_op)
+    # print(self.model.variables)
 
   def perceive(self,state,action,reward,next_state,done):
     one_hot_action = np.zeros(self.action_dim)
@@ -94,15 +113,18 @@ class DQN():
       return random.randint(0,self.action_dim - 1)
     else:
       s = tf.convert_to_tensor(state,dtype=tf.float32)
-      print(s)
+      s = tf.reshape(s, [1,self.state_dim])
+      # print(s)
       test = self.model(s)
-      print(test)
+      # print(test)
       return np.argmax(test)
 
     self.epsilon -= (INITIAL_EPSILON - FINAL_EPSILON)/10000
 
   def action(self,state):
-    return np.argmax(self.model(state))
+    s = tf.convert_to_tensor(state,dtype=tf.float32)
+    s = tf.reshape(s, [1,self.state_dim])
+    return np.argmax(self.model(s))
 
 
 # ---------------------------------------------------------
@@ -113,7 +135,7 @@ STEP = 300 # Step limitation in an episode
 TEST = 10 # The number of experiment test every 100 episode
 
 def main():
-  tf.enable_eager_execution()
+  # tf.enable_eager_execution()
   # initialize OpenAI Gym env and dqn agent
   env = gym.make(ENV_NAME)
   agent = DQN(env)
@@ -127,10 +149,11 @@ def main():
       next_state,reward,done,_ = env.step(action)
       # Define reward for agent
       reward_agent = -1 if done else 0.1
-      agent.perceive(state,action,reward_agent,next_state,done)
+      agent.perceive(state,action,reward,next_state,done)
       state = next_state
       if done:
         break
+    print ('episode', episode)
     # Test every 100 episodes
     if episode % 100 == 0:
       total_reward = 0
