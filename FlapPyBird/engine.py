@@ -1,9 +1,12 @@
 from itertools import cycle
 import random
 import sys
+import threading
+import time
 
 import pygame
 from pygame.locals import *
+
 
 
 FPS = 30
@@ -49,6 +52,7 @@ PIPES_LIST = (
     'assets/sprites/pipe-green.png',
     'assets/sprites/pipe-red.png',
 )
+ENGINE = None
 
 
 try:
@@ -59,6 +63,9 @@ except NameError:
 class FlappyEngine():
     # Engine of flappy bird
     def __init__(self):
+        self.reset()
+
+    def reset(self):
         global SCREEN, FPSCLOCK
         pygame.init()
         FPSCLOCK = pygame.time.Clock()
@@ -97,9 +104,6 @@ class FlappyEngine():
         SOUNDS['point']  = pygame.mixer.Sound('assets/audio/point' + soundExt)
         SOUNDS['swoosh'] = pygame.mixer.Sound('assets/audio/swoosh' + soundExt)
         SOUNDS['wing']   = pygame.mixer.Sound('assets/audio/wing' + soundExt)
-
-    def reset(self):
-        return
 
     def start(self):
         while True:
@@ -144,8 +148,14 @@ class FlappyEngine():
     def action(self, a):
         return
 
-    def state(self, s):
-        return
+    def state(self):
+        return [
+            self.playerx, self.playery,
+            self.upperPipes[0]['x'], self.upperPipes[0]['y'],
+            self.upperPipes[1]['x'], self.upperPipes[1]['y'],
+            self.lowerPipes[0]['x'], self.lowerPipes[0]['y'],
+            self.lowerPipes[1]['x'], self.lowerPipes[1]['y'],
+        ]
 
     def showWelcomeAnimation(self):
         """Shows welcome screen animation of flappy bird"""
@@ -155,8 +165,8 @@ class FlappyEngine():
         # iterator used to change playerIndex after every 5th iteration
         loopIter = 0
 
-        playerx = int(SCREENWIDTH * 0.2)
-        playery = int((SCREENHEIGHT - IMAGES['player'][0].get_height()) / 2)
+        self.playerx = int(SCREENWIDTH * 0.2)
+        self.playery = int((SCREENHEIGHT - IMAGES['player'][0].get_height()) / 2)
 
         messagex = int((SCREENWIDTH - IMAGES['message'].get_width()) / 2)
         messagey = int(SCREENHEIGHT * 0.12)
@@ -174,10 +184,11 @@ class FlappyEngine():
                     pygame.quit()
                     sys.exit()
                 if event.type == KEYDOWN and (event.key == K_SPACE or event.key == K_UP):
+                    print(event)
                     # make first flap sound and return values for mainGame
                     SOUNDS['wing'].play()
                     return {
-                        'playery': playery + playerShmVals['val'],
+                        'playery': self.playery + playerShmVals['val'],
                         'basex': basex,
                         'playerIndexGen': playerIndexGen,
                     }
@@ -192,7 +203,7 @@ class FlappyEngine():
             # draw sprites
             SCREEN.blit(IMAGES['background'], (0,0))
             SCREEN.blit(IMAGES['player'][playerIndex],
-                        (playerx, playery + playerShmVals['val']))
+                        (self.playerx, self.playery + playerShmVals['val']))
             SCREEN.blit(IMAGES['message'], (messagex, messagey))
             SCREEN.blit(IMAGES['base'], (basex, BASEY))
 
@@ -203,7 +214,7 @@ class FlappyEngine():
     def mainGame(self, movementInfo):
         score = playerIndex = loopIter = 0
         playerIndexGen = movementInfo['playerIndexGen']
-        playerx, playery = int(SCREENWIDTH * 0.2), movementInfo['playery']
+        self.playerx, self.playery = int(SCREENWIDTH * 0.2), movementInfo['playery']
 
         basex = movementInfo['basex']
         baseShift = IMAGES['base'].get_width() - IMAGES['background'].get_width()
@@ -213,13 +224,13 @@ class FlappyEngine():
         newPipe2 = self.getRandomPipe()
 
         # list of upper pipes
-        upperPipes = [
+        self.upperPipes = [
             {'x': SCREENWIDTH + 200, 'y': newPipe1[0]['y']},
             {'x': SCREENWIDTH + 200 + (SCREENWIDTH / 2), 'y': newPipe2[0]['y']},
         ]
 
         # list of lowerpipe
-        lowerPipes = [
+        self.lowerPipes = [
             {'x': SCREENWIDTH + 200, 'y': newPipe1[1]['y']},
             {'x': SCREENWIDTH + 200 + (SCREENWIDTH / 2), 'y': newPipe2[1]['y']},
         ]
@@ -244,29 +255,29 @@ class FlappyEngine():
                     pygame.quit()
                     sys.exit()
                 if event.type == KEYDOWN and (event.key == K_SPACE or event.key == K_UP):
-                    if playery > -2 * IMAGES['player'][0].get_height():
+                    if self.playery > -2 * IMAGES['player'][0].get_height():
                         playerVelY = playerFlapAcc
                         playerFlapped = True
                         SOUNDS['wing'].play()
 
             # check for crash here
-            crashTest = self.checkCrash({'x': playerx, 'y': playery, 'index': playerIndex},
-                                   upperPipes, lowerPipes)
+            crashTest = self.checkCrash({'x': self.playerx, 'y': self.playery, 'index': playerIndex},
+                                   self.upperPipes, self.lowerPipes)
             if crashTest[0]:
                 return {
-                    'y': playery,
+                    'y': self.playery,
                     'groundCrash': crashTest[1],
                     'basex': basex,
-                    'upperPipes': upperPipes,
-                    'lowerPipes': lowerPipes,
+                    'upperPipes': self.upperPipes,
+                    'lowerPipes': self.lowerPipes,
                     'score': score,
                     'playerVelY': playerVelY,
                     'playerRot': playerRot
                 }
 
             # check for score
-            playerMidPos = playerx + IMAGES['player'][0].get_width() / 2
-            for pipe in upperPipes:
+            playerMidPos = self.playerx + IMAGES['player'][0].get_width() / 2
+            for pipe in self.upperPipes:
                 pipeMidPos = pipe['x'] + IMAGES['pipe'][0].get_width() / 2
                 if pipeMidPos <= playerMidPos < pipeMidPos + 4:
                     score += 1
@@ -292,28 +303,28 @@ class FlappyEngine():
                 playerRot = 45
 
             playerHeight = IMAGES['player'][playerIndex].get_height()
-            playery += min(playerVelY, BASEY - playery - playerHeight)
+            self.playery += min(playerVelY, BASEY - self.playery - playerHeight)
 
             # move pipes to left
-            for uPipe, lPipe in zip(upperPipes, lowerPipes):
+            for uPipe, lPipe in zip(self.upperPipes, self.lowerPipes):
                 uPipe['x'] += pipeVelX
                 lPipe['x'] += pipeVelX
 
             # add new pipe when first pipe is about to touch left of screen
-            if 0 < upperPipes[0]['x'] < 5:
+            if 0 < self.upperPipes[0]['x'] < 5:
                 newPipe = self.getRandomPipe()
-                upperPipes.append(newPipe[0])
-                lowerPipes.append(newPipe[1])
+                self.upperPipes.append(newPipe[0])
+                self.lowerPipes.append(newPipe[1])
 
             # remove first pipe if its out of the screen
-            if upperPipes[0]['x'] < -IMAGES['pipe'][0].get_width():
-                upperPipes.pop(0)
-                lowerPipes.pop(0)
+            if self.upperPipes[0]['x'] < -IMAGES['pipe'][0].get_width():
+                self.upperPipes.pop(0)
+                self.lowerPipes.pop(0)
 
             # draw sprites
             SCREEN.blit(IMAGES['background'], (0,0))
 
-            for uPipe, lPipe in zip(upperPipes, lowerPipes):
+            for uPipe, lPipe in zip(self.upperPipes, self.lowerPipes):
                 SCREEN.blit(IMAGES['pipe'][0], (uPipe['x'], uPipe['y']))
                 SCREEN.blit(IMAGES['pipe'][1], (lPipe['x'], lPipe['y']))
 
@@ -327,7 +338,7 @@ class FlappyEngine():
                 visibleRot = playerRot
 
             playerSurface = pygame.transform.rotate(IMAGES['player'][playerIndex], visibleRot)
-            SCREEN.blit(playerSurface, (playerx, playery))
+            SCREEN.blit(playerSurface, (self.playerx, self.playery))
 
             pygame.display.update()
             FPSCLOCK.tick(FPS)
@@ -492,9 +503,34 @@ class FlappyEngine():
                 mask[x].append(bool(image.get_at((x,y))[3]))
         return mask
 
+
+class MyThread(threading.Thread):
+    def __init__(self, engine):
+        self.engine = engine
+        threading.Thread.__init__(self)
+
+    def run(self):
+        self.engine.start()
+
 def main():
     engine = FlappyEngine()
-    engine.start()
+    # mthread=threading.Thread(target=)
+    mthread = MyThread(engine)
+    # t2=threading.Thread(target=test2)
+    # # mthread.setDaemon(True) 
+    # t1.start()
+    mthread.start()
+    # t2.start()
+
+    time.sleep(1)
+    print('test3')
+    event = pygame.event.Event(KEYDOWN, {'scancode': 111, 'mod': 0, 'unicode': '', 'key': 273})
+    pygame.event.post(event)
+
+    while True:
+        time.sleep(0.1)
+        state = engine.state()
+        print(state)
 
 if __name__ == '__main__':
     main()
