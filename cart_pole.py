@@ -9,10 +9,10 @@ import gym
 import numpy as np
 import random
 from collections import deque
-config = tf.ConfigProto(device_count={"CPU": 4}, # limit to num_cpu_core CPU usage  
-                inter_op_parallelism_threads = 0,   
-                intra_op_parallelism_threads = 0,  
-                log_device_placement=True) 
+config = tf.ConfigProto(device_count={"CPU": 4}, # limit to num_cpu_core CPU usage
+                inter_op_parallelism_threads = 0,
+                intra_op_parallelism_threads = 0,
+                log_device_placement=True)
 tf.enable_eager_execution(config)
 
 # Hyper Parameters for DQN
@@ -84,19 +84,10 @@ class DQN():
     reward_tensor = tf.convert_to_tensor(y_batch, dtype=tf.float32)
     reward_tensor = tf.reshape(reward_tensor, [BATCH_SIZE, 1])
 
-    # print(state_tensor)
-    # print(reward_tensor)
-
-    # for i in range(0, BATCH_SIZE):
     # Optimize the model
     grads = self.grad(self.model, state_tensor, action_tensor, reward_tensor)
-    # print(grads)
-    # print(self.model.variables)
-    # print("applying grads")
     self.optimizer.apply_gradients(zip(grads, self.model.variables),
                             global_step=tf.train.get_or_create_global_step())
-    # self.sess.run(train_op)
-    # print(self.model.variables)
 
   def perceive(self,state,action,reward,next_state,done):
     one_hot_action = np.zeros(self.action_dim)

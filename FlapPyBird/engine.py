@@ -1,12 +1,11 @@
 from itertools import cycle
 import random
 import sys
-import threading
 import time
 
 import pygame
 from pygame.locals import *
-
+from agent import DQNAgent
 
 
 FPS = 30
@@ -17,6 +16,9 @@ PIPEGAPSIZE  = 100 # gap between upper and lower part of pipe
 BASEY        = SCREENHEIGHT * 0.79
 # image, sound and hitmask  dicts
 IMAGES, SOUNDS, HITMASKS = {}, {}, {}
+S_ON = 0
+S_PAUSE = 1
+S_DEAD = 2
 
 # list of all possible players (tuple of 3 positions of flap)
 PLAYERS_LIST = (
@@ -65,6 +67,12 @@ class FlappyEngine():
     def __init__(self):
         self.reset()
 
+    def pause(self):
+        self.status = S_PAUSE
+
+    def resume(self):
+        self.status = S_ON
+
     def reset(self):
         global SCREEN, FPSCLOCK
         pygame.init()
@@ -104,6 +112,7 @@ class FlappyEngine():
         SOUNDS['point']  = pygame.mixer.Sound('assets/audio/point' + soundExt)
         SOUNDS['swoosh'] = pygame.mixer.Sound('assets/audio/swoosh' + soundExt)
         SOUNDS['wing']   = pygame.mixer.Sound('assets/audio/wing' + soundExt)
+        self.status = S_ON
 
     def start(self):
         while True:
@@ -150,6 +159,7 @@ class FlappyEngine():
 
     def state(self):
         return [
+            self.status,
             self.playerx, self.playery,
             self.upperPipes[0]['x'], self.upperPipes[0]['y'],
             self.upperPipes[1]['x'], self.upperPipes[1]['y'],
@@ -250,6 +260,8 @@ class FlappyEngine():
 
 
         while True:
+            while self.status == S_PAUSE:
+                time.sleep(0.001)
             for event in pygame.event.get():
                 if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
                     pygame.quit()
@@ -264,6 +276,7 @@ class FlappyEngine():
             crashTest = self.checkCrash({'x': self.playerx, 'y': self.playery, 'index': playerIndex},
                                    self.upperPipes, self.lowerPipes)
             if crashTest[0]:
+                self.status = S_DEAD
                 return {
                     'y': self.playery,
                     'groundCrash': crashTest[1],
@@ -274,6 +287,7 @@ class FlappyEngine():
                     'playerVelY': playerVelY,
                     'playerRot': playerRot
                 }
+            self.status = S_ON
 
             # check for score
             playerMidPos = self.playerx + IMAGES['player'][0].get_width() / 2
@@ -502,35 +516,3 @@ class FlappyEngine():
             for y in xrange(image.get_height()):
                 mask[x].append(bool(image.get_at((x,y))[3]))
         return mask
-
-
-class MyThread(threading.Thread):
-    def __init__(self, engine):
-        self.engine = engine
-        threading.Thread.__init__(self)
-
-    def run(self):
-        self.engine.start()
-
-def main():
-    engine = FlappyEngine()
-    # mthread=threading.Thread(target=)
-    mthread = MyThread(engine)
-    # t2=threading.Thread(target=test2)
-    # # mthread.setDaemon(True) 
-    # t1.start()
-    mthread.start()
-    # t2.start()
-
-    time.sleep(1)
-    print('test3')
-    event = pygame.event.Event(KEYDOWN, {'scancode': 111, 'mod': 0, 'unicode': '', 'key': 273})
-    pygame.event.post(event)
-
-    while True:
-        time.sleep(0.1)
-        state = engine.state()
-        print(state)
-
-if __name__ == '__main__':
-    main()
