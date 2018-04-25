@@ -1,9 +1,19 @@
+from __future__ import absolute_import, division, print_function
+
 import random
 import sys
 import time
+import os
+import matplotlib.pyplot as plt
 
+import tensorflow as tf
+import tensorflow.contrib.eager as tfe
+import gym
+import numpy as np
 import pygame
+
 from pygame.locals import *
+from collections import deque
 
 DOWN_EVENT = pygame.event.Event(KEYDOWN, {'scancode': 111, 'mod': 0, 'unicode': '', 'key': 273})
 CLICK = 1
@@ -24,14 +34,15 @@ class DQNAgent():
         self.replay_buffer = deque()
         self.action_dim = 2
         self.state_dim = 10
+        self.create_Q_network()
 
     def ready(self):
         pygame.event.post(DOWN_EVENT)
 
-    def memorize(self, state, action, reward, next_state):
+    def memorize(self, state, action, reward, next_state, done):
         one_hot_action = np.zeros(self.action_dim)
         one_hot_action[action] = 1
-        self.replay_buffer.append((state, one_hot_action, reward, next_state))
+        self.replay_buffer.append((state, one_hot_action, reward, next_state, done))
         if len(self.replay_buffer) > REPLAY_SIZE:
           self.replay_buffer.popleft()
 
@@ -58,6 +69,7 @@ class DQNAgent():
     def train_Q_network(self):
       # Step 1: obtain random minibatch from replay memory
       minibatch = random.sample(self.replay_buffer, BATCH_SIZE)
+      print(minibatch)
       state_batch = [data[0] for data in minibatch]
       action_batch = [data[1] for data in minibatch]
       reward_batch = [data[2] for data in minibatch]
@@ -66,7 +78,8 @@ class DQNAgent():
       # Step 2: calculate y
       Q_value_batch = []
       for i in range(0, BATCH_SIZE):
-        s = tf.convert_to_tensor(next_state_batch[i], dtype=tf.float32)
+        # s = tf.convert_to_tensor(next_state_batch[i], dtype=tf.float32)
+        s = tf.convert_to_tensor(next_state_batch[i])
         s = tf.reshape(s, [1,self.state_dim])
         Q_value_batch.append(self.model(s))
 
@@ -77,9 +90,12 @@ class DQNAgent():
           y_batch.append(reward_batch[i])
         else :
           y_batch.append(reward_batch[i] + GAMMA * np.max(Q_value_batch[i]))
-      state_tensor = tf.convert_to_tensor(state_batch, dtype=tf.float32)
-      action_tensor = tf.convert_to_tensor(action_batch, dtype=tf.float32)
-      reward_tensor = tf.convert_to_tensor(y_batch, dtype=tf.float32)
+      state_tensor = tf.convert_to_tensor(state_batch)
+      # state_tensor = tf.convert_to_tensor(state_batch, dtype=tf.float32)
+      action_tensor = tf.convert_to_tensor(action_batch)
+      # action_tensor = tf.convert_to_tensor(action_batch, dtype=tf.float32)
+      reward_tensor = tf.convert_to_tensor(y_batch)
+      # reward_tensor = tf.convert_to_tensor(y_batch, dtype=tf.float32)
       reward_tensor = tf.reshape(reward_tensor, [BATCH_SIZE, 1])
 
       # Optimize the model
@@ -98,7 +114,7 @@ class DQNAgent():
             return self.action()
 
     def action(self):
-        state = self.engine.state()
+        state = self.engine.state()[1:]
         action = self._pie(state)
         if action == CLICK:
             pygame.event.post(DOWN_EVENT)
