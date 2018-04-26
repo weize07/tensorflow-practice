@@ -33,8 +33,8 @@ def train(engine, agent):
             reward = -1
             agent.ready()
         else:
-            reward = 1
-        agent.memorize(np.array(stateT[1:], dtype=np.float32), action, reward, np.array(stateT1[1:], dtype=np.float32), stateT1[0] == S_DEAD)
+            reward = 0
+        agent.memorize(stateT[1:], action, reward, stateT1[1:], stateT1[0] == S_DEAD)
         if totalTick > BATCH_SIZE:
             engine.pause()
             agent.train_Q_network()
@@ -43,8 +43,10 @@ def train(engine, agent):
         tick += 1
 
 def test(engine, agent):
-    if engine.state()[0] == S_DEAD:
-        agent.ready()
+    engine.pause()
+    engine.reset()
+    time.sleep(1)
+    agent.ready()
     while True:
         time.sleep(0.1)
         agent.action()

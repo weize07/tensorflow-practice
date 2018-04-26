@@ -6,6 +6,7 @@ import time
 import pygame
 from pygame.locals import *
 from agent import DQNAgent
+import numpy as np
 
 
 FPS = 30
@@ -158,14 +159,19 @@ class FlappyEngine():
         return
 
     def state(self):
-        return [
-            self.status,
-            self.playerx, self.playery,
-            self.upperPipes[0]['x'], self.upperPipes[0]['y'],
-            self.upperPipes[1]['x'], self.upperPipes[1]['y'],
-            self.lowerPipes[0]['x'], self.lowerPipes[0]['y'],
-            self.lowerPipes[1]['x'], self.lowerPipes[1]['y'],
-        ]
+        a = np.zeros(11, dtype=np.float32)
+        a[0] = self.status
+        a[1] = self.playerx
+        a[2] = self.playery
+        a[3] = self.upperPipes[0]['x']
+        a[4] = self.upperPipes[0]['y']
+        a[5] = self.upperPipes[1]['x']
+        a[6] = self.upperPipes[1]['y']
+        a[7] = self.lowerPipes[0]['x']
+        a[8] = self.lowerPipes[0]['y']
+        a[9] = self.lowerPipes[1]['x']
+        a[10] = self.lowerPipes[1]['y']
+        return a
 
     def showWelcomeAnimation(self):
         """Shows welcome screen animation of flappy bird"""

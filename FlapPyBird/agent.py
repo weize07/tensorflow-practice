@@ -14,6 +14,11 @@ import pygame
 
 from pygame.locals import *
 from collections import deque
+config = tf.ConfigProto(device_count={"CPU": 4}, # limit to num_cpu_core CPU usage
+                inter_op_parallelism_threads = 0,
+                intra_op_parallelism_threads = 0,
+                log_device_placement=True)
+tf.enable_eager_execution(config)
 
 DOWN_EVENT = pygame.event.Event(KEYDOWN, {'scancode': 111, 'mod': 0, 'unicode': '', 'key': 273})
 CLICK = 1
@@ -42,13 +47,21 @@ class DQNAgent():
     def memorize(self, state, action, reward, next_state, done):
         one_hot_action = np.zeros(self.action_dim)
         one_hot_action[action] = 1
-        self.replay_buffer.append((state, one_hot_action, reward, next_state, done))
+        # print(state)
+        # print(one_hot_action)
+        # print(reward)
+        # print(next_state)
+        # print(done)
+        # exit(0)
+        print(state.shape)
+        self.replay_buffer.append((state,one_hot_action,reward,next_state,done))
         if len(self.replay_buffer) > REPLAY_SIZE:
           self.replay_buffer.popleft()
 
     def create_Q_network(self):
       self.model = tf.keras.Sequential([
         tf.keras.layers.Dense(20, activation="relu", input_shape=(self.state_dim,)),  # input shape required
+        tf.keras.layers.Dense(256, activation="relu"),
         tf.keras.layers.Dense(self.action_dim)
       ])
       self.optimizer = tf.train.AdamOptimizer(learning_rate=0.001)
@@ -69,7 +82,7 @@ class DQNAgent():
     def train_Q_network(self):
       # Step 1: obtain random minibatch from replay memory
       minibatch = random.sample(self.replay_buffer, BATCH_SIZE)
-      print(minibatch)
+      # print(minibatch)
       state_batch = [data[0] for data in minibatch]
       action_batch = [data[1] for data in minibatch]
       reward_batch = [data[2] for data in minibatch]
@@ -90,12 +103,12 @@ class DQNAgent():
           y_batch.append(reward_batch[i])
         else :
           y_batch.append(reward_batch[i] + GAMMA * np.max(Q_value_batch[i]))
-      state_tensor = tf.convert_to_tensor(state_batch)
-      # state_tensor = tf.convert_to_tensor(state_batch, dtype=tf.float32)
-      action_tensor = tf.convert_to_tensor(action_batch)
-      # action_tensor = tf.convert_to_tensor(action_batch, dtype=tf.float32)
-      reward_tensor = tf.convert_to_tensor(y_batch)
-      # reward_tensor = tf.convert_to_tensor(y_batch, dtype=tf.float32)
+      # state_tensor = tf.convert_to_tensor(state_batch)
+      state_tensor = tf.convert_to_tensor(state_batch, dtype=tf.float32)
+      # action_tensor = tf.convert_to_tensor(action_batch)
+      action_tensor = tf.convert_to_tensor(action_batch, dtype=tf.float32)
+      # reward_tensor = tf.convert_to_tensor(y_batch)
+      reward_tensor = tf.convert_to_tensor(y_batch, dtype=tf.float32)
       reward_tensor = tf.reshape(reward_tensor, [BATCH_SIZE, 1])
 
       # Optimize the model
