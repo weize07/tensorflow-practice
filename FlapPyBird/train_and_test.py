@@ -17,7 +17,11 @@ def main():
     while True:
         round += 1
         print("round-", round, ": training...")
+        print("epsilon: ", agent.epsilon)
         train(engine, agent)
+        for layer in agent.model.layers:
+            h=layer.get_weights()
+            print (h)
         print("round-", round, ": testing...")
         test(engine, agent)
 
@@ -30,10 +34,11 @@ def train(engine, agent):
         action = agent.egreedy()
         stateT1 = engine.state()
         if stateT1[0] == S_DEAD:
-            reward = -1
-            agent.ready()
+            reward = -1000
+            # agent.ready()
+            # break
         else:
-            reward = 0
+            reward = 1
         agent.memorize(stateT[1:], action, reward, stateT1[1:], stateT1[0] == S_DEAD)
         if totalTick > BATCH_SIZE:
             engine.pause()
@@ -43,10 +48,10 @@ def train(engine, agent):
         tick += 1
 
 def test(engine, agent):
-    engine.pause()
-    engine.reset()
-    time.sleep(1)
-    agent.ready()
+    # engine.pause()
+    # engine.reset()
+    # time.sleep(1)
+    # agent.ready()
     while True:
         time.sleep(0.1)
         agent.action()

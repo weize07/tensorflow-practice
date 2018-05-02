@@ -20,6 +20,8 @@ IMAGES, SOUNDS, HITMASKS = {}, {}, {}
 S_ON = 0
 S_PAUSE = 1
 S_DEAD = 2
+S_STOP = 3
+S_RESETTING = 4
 
 # list of all possible players (tuple of 3 positions of flap)
 PLAYERS_LIST = (
@@ -75,6 +77,9 @@ class FlappyEngine():
         self.status = S_ON
 
     def reset(self):
+        self.status = S_RESETTING
+
+    def _reset(self):
         global SCREEN, FPSCLOCK
         pygame.init()
         FPSCLOCK = pygame.time.Clock()
@@ -115,8 +120,11 @@ class FlappyEngine():
         SOUNDS['wing']   = pygame.mixer.Sound('assets/audio/wing' + soundExt)
         self.status = S_ON
 
+
     def start(self):
         while True:
+            if self.status == S_RESETTING:
+                self._reset()
             # select random background sprites
             randBg = random.randint(0, len(BACKGROUNDS_LIST) - 1)
             IMAGES['background'] = pygame.image.load(BACKGROUNDS_LIST[randBg]).convert()
@@ -152,7 +160,7 @@ class FlappyEngine():
 
             movementInfo = self.showWelcomeAnimation()
             crashInfo = self.mainGame(movementInfo)
-            self.showGameOverScreen(crashInfo)
+            # self.showGameOverScreen(crashInfo)
 
     # returns next state;
     def action(self, a):
@@ -163,14 +171,14 @@ class FlappyEngine():
         a[0] = self.status
         a[1] = self.playerx
         a[2] = self.playery
-        a[3] = self.upperPipes[0]['x']
-        a[4] = self.upperPipes[0]['y']
-        a[5] = self.upperPipes[1]['x']
-        a[6] = self.upperPipes[1]['y']
-        a[7] = self.lowerPipes[0]['x']
-        a[8] = self.lowerPipes[0]['y']
-        a[9] = self.lowerPipes[1]['x']
-        a[10] = self.lowerPipes[1]['y']
+        a[3] = self.upperPipes[0]['x'] - a[1]
+        a[4] = self.upperPipes[0]['y'] - a[2]
+        a[5] = self.upperPipes[1]['x'] - a[1]
+        a[6] = self.upperPipes[1]['y'] - a[2]
+        a[7] = self.lowerPipes[0]['x'] - a[1]
+        a[8] = self.lowerPipes[0]['y'] - a[2]
+        a[9] = self.lowerPipes[1]['x'] - a[1]
+        a[10] = self.lowerPipes[1]['y'] - a[2]
         return a
 
     def showWelcomeAnimation(self):
@@ -194,37 +202,42 @@ class FlappyEngine():
         # player shm for up-down motion on welcome screen
         playerShmVals = {'val': 0, 'dir': 1}
 
-        while True:
-            for event in pygame.event.get():
-                if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
-                    pygame.quit()
-                    sys.exit()
-                if event.type == KEYDOWN and (event.key == K_SPACE or event.key == K_UP):
-                    print(event)
-                    # make first flap sound and return values for mainGame
-                    SOUNDS['wing'].play()
-                    return {
+        return {
                         'playery': self.playery + playerShmVals['val'],
                         'basex': basex,
                         'playerIndexGen': playerIndexGen,
                     }
+        # while True:
+        #     for event in pygame.event.get():
+        #         if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
+        #             pygame.quit()
+        #             sys.exit()
+        #         if event.type == KEYDOWN and (event.key == K_SPACE or event.key == K_UP):
+        #             print(event)
+        #             # make first flap sound and return values for mainGame
+        #             SOUNDS['wing'].play()
+        #             return {
+        #                 'playery': self.playery + playerShmVals['val'],
+        #                 'basex': basex,
+        #                 'playerIndexGen': playerIndexGen,
+        #             }
 
-            # adjust playery, playerIndex, basex
-            if (loopIter + 1) % 5 == 0:
-                playerIndex = next(playerIndexGen)
-            loopIter = (loopIter + 1) % 30
-            basex = -((-basex + 4) % baseShift)
-            self.playerShm(playerShmVals)
+        #     # adjust playery, playerIndex, basex
+        #     if (loopIter + 1) % 5 == 0:
+        #         playerIndex = next(playerIndexGen)
+        #     loopIter = (loopIter + 1) % 30
+        #     basex = -((-basex + 4) % baseShift)
+        #     self.playerShm(playerShmVals)
 
-            # draw sprites
-            SCREEN.blit(IMAGES['background'], (0,0))
-            SCREEN.blit(IMAGES['player'][playerIndex],
-                        (self.playerx, self.playery + playerShmVals['val']))
-            SCREEN.blit(IMAGES['message'], (messagex, messagey))
-            SCREEN.blit(IMAGES['base'], (basex, BASEY))
+        #     # draw sprites
+        #     SCREEN.blit(IMAGES['background'], (0,0))
+        #     SCREEN.blit(IMAGES['player'][playerIndex],
+        #                 (self.playerx, self.playery + playerShmVals['val']))
+        #     SCREEN.blit(IMAGES['message'], (messagex, messagey))
+        #     SCREEN.blit(IMAGES['base'], (basex, BASEY))
 
-            pygame.display.update()
-            FPSCLOCK.tick(FPS)
+        #     pygame.display.update()
+        #     FPSCLOCK.tick(FPS)
 
 
     def mainGame(self, movementInfo):
@@ -293,7 +306,6 @@ class FlappyEngine():
                     'playerVelY': playerVelY,
                     'playerRot': playerRot
                 }
-            self.status = S_ON
 
             # check for score
             playerMidPos = self.playerx + IMAGES['player'][0].get_width() / 2

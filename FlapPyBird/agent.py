@@ -27,7 +27,7 @@ HOLDON = 0
 # Hyper Parameters for DQN
 GAMMA = 0.9 # discount factor for target Q
 INITIAL_EPSILON = 0.5 # starting value of epsilon
-FINAL_EPSILON = 0.01 # final value of epsilon
+FINAL_EPSILON = 0.001 # final value of epsilon
 REPLAY_SIZE = 10000 # experience replay buffer size
 BATCH_SIZE = 32 # size of minibatch
 
@@ -53,7 +53,7 @@ class DQNAgent():
         # print(next_state)
         # print(done)
         # exit(0)
-        print(state.shape)
+        # print(state.shape)
         self.replay_buffer.append((state,one_hot_action,reward,next_state,done))
         if len(self.replay_buffer) > REPLAY_SIZE:
           self.replay_buffer.popleft()
@@ -123,7 +123,7 @@ class DQNAgent():
                 pygame.event.post(DOWN_EVENT)
             return action
         else:
-            self.epsilon -= (INITIAL_EPSILON - FINAL_EPSILON)/10000
+            self.epsilon -= (INITIAL_EPSILON - FINAL_EPSILON)/1000000
             return self.action()
 
     def action(self):
