@@ -5,15 +5,22 @@ from numpy import genfromtxt
 from sklearn import preprocessing
 from datetime import datetime
 
-timesteps = 10
+timesteps = 20
 
 my_data = genfromtxt('../data/cf_07_03.csv', delimiter=',')
+test_data = genfromtxt('../data/cf_07_04.csv', delimiter=',')
 my_data = my_data[1:]
+test_data = test_data[1:]
+
 my_data_raw = np.nan_to_num(my_data)
+test_data_raw = np.nan_to_num(test_data)
+
 my_data = np.delete(my_data_raw, 0, 1)
+test_data = np.delete(test_data_raw, 0, 1)
 # min_max_scaler = preprocessing.MinMaxScaler()
 # my_data = min_max_scaler.fit_transform(my_data)
 my_data = preprocessing.scale(my_data)
+test_data = preprocessing.scale(test_data)
 
 '''
 features: Process.RpcHandler.HttpQuery,Process.Incoming.RowkeyTemplate,Process.ConnectionManager.Open,Process.UniqueId.Got,Process.Query.RegexScan,Process.NioWorker.Read,Process.SaltScanner.MergeSort,Exception.MetricName.Invalid,Process.TSDB.AddPoint,Exception.Hbase.Remote.IO,Exception.Runtime.ShouldNotBeHere,Process.PutDataPointRpc,Success.Query.New,Exception.Stumbleupon.Defer,Warn.UniqueId.AlreadyWaiting.Assign,Process.ConnectionManager.HandleUpstream,Process.QueryRpc.TSQuery,Process.CompactionQueue.Flush,Process.Frame.Omit,Process.Put.Done,Query.Execute.New,Success.Stumbleupon.Defer,Exception.UniqueId.Assign,Query.RegionClient.Done,Exception.RegionClient.Decode,Exception.UniqueId.Fail.PendingAssignment,Exception.QueryRpc,Process.Remove.CompletedQuery,Process.UniqueId.Complete.PendingAssignment,Query.Completing,Process.SaltScanner.Scan.Complete"]
@@ -28,15 +35,24 @@ Process.Rocksdb.L0.CommitSuccess,Process.Rocksdb.Compaction.MovedTo.L1,Exception
 
 
 X_tmp = []
+X_test_tmp = []
 Y_tmp = []
+Y_test_tmp = []
 X_tmp_raw = []
+X_test_tmp_raw = []
 for i in range(len(my_data) - timesteps - 1):
     X_tmp.append(my_data[i:i + timesteps])
     Y_tmp.append(my_data[i + timesteps])
+    X_test_tmp.append(test_data[i:i + timesteps])
+    Y_test_tmp.append(test_data[i + timesteps])
     X_tmp_raw.append(my_data_raw[i:i + timesteps])
+    X_test_tmp_raw.append(test_data_raw[i:i + timesteps])
 X = np.array(X_tmp)
+X_test = np.array(X_test_tmp)
 X_raw = np.array(X_tmp_raw)
+X_test_raw = np.array(X_test_tmp_raw)
 Y = np.array(Y_tmp)
+Y_test = np.array(Y_test_tmp)
 
 randomize = np.arange(len(X))
 np.random.shuffle(randomize)
@@ -49,10 +65,10 @@ output_dim = len(Y[0])
 
 # 期望输入数据尺寸: (batch_size, timesteps, data_dim)
 model = Sequential()
-# model.add(LSTM(32, return_sequences=True, dropout=0.2, recurrent_dropout=0.2,
-#                 input_shape=(timesteps, input_dim)))
-model.add(LSTM(32, return_sequences=True,
+model.add(LSTM(32, return_sequences=True, dropout=0.2, recurrent_dropout=0.2,
                 input_shape=(timesteps, input_dim)))
+# model.add(LSTM(32, return_sequences=True
+#                 input_shape=(timesteps, input_dim)))
 # model.add(LSTM(32, return_sequences=True, dropout=0.2, recurrent_dropout=0.2))
 model.add(LSTM(16))
 model.add(Dense(output_dim))
@@ -77,7 +93,7 @@ model.fit(x_train, y_train,
           validation_data=(x_val, y_val))
 
 # dict = {}
-y_preds = model.predict(X)
-for i in range(len(X_raw)):
-    loss = np.linalg.norm(y_preds[i] - Y[i])
-    print(X_raw[i][timesteps - 1][0] + 60, datetime.fromtimestamp(X_raw[i][timesteps - 1][0] + 60), loss)
+y_preds = model.predict(X_test)
+for i in range(len(X_test_raw)):
+    loss = np.linalg.norm(y_preds[i] - Y_test[i])
+    print(X_test_raw[i][timesteps - 1][0] + 60, datetime.fromtimestamp(X_test_raw[i][timesteps - 1][0] + 60), loss)
